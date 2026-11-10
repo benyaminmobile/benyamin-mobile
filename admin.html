@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>پنل مدیریت | بنیامین موبایل</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #101010;
+      color: #f4f0e7;
+      font-family: Tahoma, Arial, sans-serif;
+      line-height: 1.8;
+    }
+
+    main {
+      max-width: 900px;
+      margin: auto;
+    }
+
+    .card {
+      background: #191919;
+      border: 1px solid #b99645;
+      border-radius: 14px;
+      padding: 22px;
+      margin: 20px 0;
+    }
+
+    h1, h2 {
+      color: #d7b45a;
+    }
+
+    label {
+      display: block;
+      margin: 12px 0 5px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #777;
+      background: #222;
+      color: white;
+      font-size: 16px;
+      font-family: inherit;
+    }
+
+    button {
+      padding: 11px 20px;
+      border: 0;
+      border-radius: 8px;
+      background: #d7b45a;
+      color: #111;
+      font-weight: bold;
+      font-family: inherit;
+      cursor: pointer;
+      margin: 8px 4px 8px 0;
+    }
+
+    button:disabled {
+      opacity: .6;
+      cursor: wait;
+    }
+
+    #status, .feedback {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      margin-top: 14px;
+    }
+
+    .request {
+      border: 1px solid #b99645;
+      border-radius: 10px;
+      padding: 16px;
+      margin: 16px 0;
+      background: #202020;
+      overflow-wrap: anywhere;
+    }
+
+    .request h3 {
+      color: #d7b45a;
+      margin-top: 0;
+    }
+
+    .muted {
+      color: #c4c4c4;
+    }
+
+    .success {
+      color: #81e6a1;
+    }
+
+    .error {
+      color: #ff8a8a;
+    }
+
+    .status-area {
+      border-top: 1px solid #444;
+      margin-top: 16px;
+      padding-top: 12px;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+<main>
+  <h1>BENYAMIN MOBILE</h1>
+  <p class="muted">پنل مدیریت درخواست‌های تعمیر</p>
+
+  <section class="card" id="loginCard">
+    <h2>ورود مدیر</h2>
+
+    <form id="loginForm">
+      <label for="email">ایمیل مدیر</label>
+      <input
+        id="email"
+        type="email"
+        autocomplete="username"
+        required
+      >
+
+      <label for="password">رمز عبور</label>
+      <input
+        id="password"
+        type="password"
+        autocomplete="current-password"
+        required
+      >
+
+      <button id="loginButton" type="submit">ورود</button>
+    </form>
+
+    <p id="status" role="status"></p>
+  </section>
+
+  <section class="card" id="dashboard" hidden>
+    <h2>درخواست‌های تعمیر</h2>
+
+    <button id="refreshButton" type="button">تازه‌سازی</button>
+    <button id="logoutButton" type="button">خروج از حساب</button>
+
+    <div id="requests" aria-live="polite"></div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./config.js"></script>
+
+<script>
+(function () {
+  const loginForm = document.getElementById('loginForm');
+  const loginCard = document.getElementById('loginCard');
+  const dashboard = document.getElementById('dashboard');
+  const loginButton = document.getElementById('loginButton');
+  const statusMessage = document.getElementById('status');
+  const requests = document.getElementById('requests');
+
+  let client = null;
+  let loading = false;
+
+  const statusLabels = {
+    pending: 'در انتظار بررسی',
+    in_progress: 'در حال تعمیر',
+    completed: 'تعمیر تکمیل شد',
+    cancelled: 'لغو شد'
+  };
+
+  function setup() {
+    if (!window.supabase) {
+      statusMessage.textContent =
+        'کتابخانه Supabase بارگذاری نشد. اتصال اینترنت را بررسی کن.';
+      return false;
+    }
+
+    const url = window.BENYAMIN_SUPABASE_URL;
+    const key = window.BENYAMIN_SUPABASE_KEY;
+    if (
+      !url ||
+      !key ||
+      url.includes('YOUR-PROJECT-REF') ||
+      key.includes('YOUR_PUBLIC_KEY') ||
+      url.includes('PASTE_') ||
+      key.includes('PASTE_')
+    ) {
+      statusMessage.textContent =
+        'اطلاعات اتصال Supabase در فایل config.js تنظیم نشده است.';
+      return false;
+    }
+
+    try {
+      if (!client) {
+        client = window.supabase.createClient(url, key);
+      }
+      return true;
+    } catch (error) {
+      statusMessage.textContent =
+        'خطا در اتصال: ' + error.message;
+      return false;
+    }
+  }
+
+  function addText(parent, tag, text, className) {
+    const element = document.createElement(tag);
+    element.textContent = text;
+
+    if (className) {
+      element.className = className;
+    }
+
+    parent.appendChild(element);
+    return element;
+  }
+
+  async function loadRequests() {
+    if (!client || loading) return;
+
+    loading = true;
+    requests.textContent = 'در حال دریافت درخواست‌ها...';
+
+    try {
+      const { data, error } = await client
+        .from('repair_requests')
+        .select(
+          'id, customer_name, phone, device, problem, created_at, status'
+        )
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      requests.replaceChildren();
+
+      if (!data || data.length === 0) {
+        requests.textContent =
+          'هنوز درخواست تعمیری ثبت نشده است.';
+        return;
+      }
+
+      data.forEach(function (item) {
+        const card = document.createElement('article');
+        card.className = 'request';
+
+        addText(
+          card,
+          'h3',
+          item.customer_name || 'بدون نام'
+        );
+
+        addText(
+          card,
+          'p',
+          'شماره تماس: ' + (item.phone || '-')
+        );
+
+        addText(
+          card,
+          'p',
+          'مدل گوشی: ' + (item.device || '-')
+        );
+
+        addText(
+          card,
+          'p',
+          'مشکل: ' + (item.problem || '-')
+        );
+
+        addText(
+          card,
+          'p',
+          'زمان ثبت: ' + (
+            item.created_at
+              ? new Date(item.created_at).toLocaleString('fa-IR')
+              : '-'
+          )
+        );
+
+        const statusArea = document.createElement('div');
+        statusArea.className = 'status-area';
+
+        addText(statusArea, 'label', 'وضعیت تعمیر');
+
+        const select = document.createElement('select');
+        select.setAttribute(
+          'aria-label',
+          'وضعیت تعمیر ' + (item.customer_name || '')
+        );
+
+        Object.entries(statusLabels).forEach(function ([value, label]) {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = label;
+          select.appendChild(option);
+        });
+
+        select.value = statusLabels[item.status]
+          ? item.status
+          : 'pending';
+
+        const saveButton = document.createElement('button');
+        saveButton.type = 'button';
+        saveButton.textContent = 'ذخیره وضعیت';
+
+        const feedback = document.createElement('p');
+        feedback.className = 'feedback';
+        feedback.setAttribute('role', 'status');
+
+        saveButton.addEventListener('click', async function () {
+          saveButton.disabled = true;
+          select.disabled = true;
+          feedback.className = 'feedback';
+          feedback.textContent = 'در حال ذخیره وضعیت...';
+
+          try {
+            const { data: updatedRows, error } = await client
+              .from('repair_requests')
+              .update({ status: select.value })
+              .eq('id', item.id)
+              .select('id');
+
+            if (error) throw error;
+
+            if (!updatedRows || updatedRows.length === 0) {
+              throw new Error(
+                'وضعیت تغییر نکرد. دسترسی UPDATE در سیاست‌های RLS را بررسی کن.'
+              );
+            }
+            item.status = select.value;
+            feedback.className = 'feedback success';
+            feedback.textContent =
+              'وضعیت با موفقیت ذخیره شد: ' +
+              statusLabels[item.status];
+          } catch (error) {
+            console.error('Status update failed:', error);
+            feedback.className = 'feedback error';
+            feedback.textContent =
+              'ذخیره وضعیت ناموفق بود: ' +
+              (error.message || 'خطای ناشناخته');
+          } finally {
+            saveButton.disabled = false;
+            select.disabled = false;
+          }
+        });
+
+        statusArea.appendChild(select);
+        statusArea.appendChild(saveButton);
+        statusArea.appendChild(feedback);
+        card.appendChild(statusArea);
+        requests.appendChild(card);
+      });
+    } catch (error) {
+      console.error('Loading requests failed:', error);
+      requests.textContent =
+        'دریافت درخواست‌ها ناموفق بود: ' +
+        (error.message || 'خطای ناشناخته');
+    } finally {
+      loading = false;
+    }
+  }
+
+  loginForm.addEventListener('submit', async function (event) {
+    event.preventDefault();
+
+    if (!client && !setup()) return;
+
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    loginButton.disabled = true;
+    statusMessage.textContent = 'در حال بررسی اطلاعات ورود...';
+
+    try {
+      const { data, error } = await client.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
+
+      if (error) throw error;
+
+      if (!data.session) {
+        throw new Error('نشست ورود ایجاد نشد. دوباره تلاش کن.');
+      }
+
+      loginCard.hidden = true;
+      dashboard.hidden = false;
+      statusMessage.textContent = '';
+
+      await loadRequests();
+    } catch (error) {
+      console.error('Login failed:', error);
+      statusMessage.textContent =
+        'ورود ناموفق بود: ' +
+        (error.message || 'خطای ناشناخته');
+    } finally {
+      loginButton.disabled = false;
+    }
+  });
+
+  document.getElementById('refreshButton')
+    .addEventListener('click', loadRequests);
+
+  document.getElementById('logoutButton')
+    .addEventListener('click', async function () {
+      if (!client) return;
+
+      const button = this;
+      button.disabled = true;
+
+      try {
+        const { error } = await client.auth.signOut();
+
+        if (error) throw error;
+
+        dashboard.hidden = true;
+        loginCard.hidden = false;
+        document.getElementById('password').value = '';
+        statusMessage.textContent = 'از حساب خارج شدی.';
+        requests.replaceChildren();
+      } catch (error) {
+        statusMessage.textContent =
+          'خطا هنگام خروج: ' + error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+  setup();
+})();
+</script>
+
+</body>
+</html>
