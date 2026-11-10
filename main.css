@@ -529,6 +529,78 @@ img {
     margin-bottom: 25px;
 }
 
+/* Accessories Shop */
+.accessories {
+    padding: 80px 0;
+}
+
+.accessories-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 22px;
+    margin-top: 40px;
+}
+
+.accessory-card {
+    background: linear-gradient(145deg, #252525, #111111);
+    border: 1px solid #d4af37;
+    border-radius: 18px;
+    padding: 30px 20px;
+    text-align: center;
+    transition: 0.3s ease;
+}
+
+.accessory-card:hover {
+    transform: translateY(-7px);
+    background: #30260e;
+    box-shadow: 0 10px 25px rgba(212,175,55,0.2);
+}
+
+.accessory-icon {
+    font-size: 48px;
+    margin-bottom: 18px;
+}
+
+.accessory-card h3 {
+    color: #ffd700;
+    font-size: 19px;
+    margin-bottom: 12px;
+}
+
+.accessory-card p {
+    color: #eeeeee;
+    font-size: 14px;
+    line-height: 2;
+}
+
+.accessory-card a {
+    display: inline-block;
+    background: #d4af37;
+    color: #111111;
+    padding: 12px 18px;
+    border-radius: 10px;
+    text-decoration: none;
+    margin-top: 15px;
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+.accessory-card a:hover {
+    background: #ffffff;
+    color: #111111;
+}
+
+@media (max-width: 850px) {
+    .accessories-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 520px) {
+    .accessories-grid {
+        grid-template-columns: 1fr;
+    }
+}
 /* PORTFOLIO */
 
 .portfolio {
@@ -581,7 +653,54 @@ img {
     font-size: 15px;
     margin-top: 3px;
 }
+.contact-info-box {
+    max-width: 850px;
+    margin: 35px auto 0;
+    padding: 30px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 30px;
+    background: #151515;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 8px;
+}
 
+.contact-address,
+.contact-instagram {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+}
+
+.contact-address > span,
+.contact-instagram > span {
+    font-size: 28px;
+}
+
+.contact-info-box h3 {
+    color: #d4af37;
+    margin: 0 0 10px;
+}
+
+.contact-info-box p {
+    color: #ccc;
+    line-height: 1.9;
+    margin: 0 0 10px;
+}
+
+.contact-instagram a {
+    color: #d4af37;
+    text-decoration: none;
+}
+
+@media (max-width: 600px) {
+    .contact-info-box {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 22px;
+    }
+}
 /* CTA */
 
 .cta {
